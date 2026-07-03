@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindFlow - Privacy & Data Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0d0f14;
+      --bg-glass: rgba(18, 22, 33, 0.7);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --text-main: #f0f2f5;
+      --text-muted: #9da8b6;
+      --primary: #85d7ff;
+      --danger: #ff6b6b;
+      --success: #6beb8c;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: radial-gradient(circle at 50% 0%, #171b26 0%, #0d0f14 80%);
+      color: var(--text-main);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .privacy-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      max-width: 650px;
+      width: 100%;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+    
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    h2 {
+      font-size: 1.2rem;
+      font-weight: 500;
+      margin-top: 25px;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+    
+    p, li {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 15px;
+    }
+    
+    ul {
+      list-style-position: inside;
+      margin-bottom: 15px;
+    }
+    
+    li {
+      margin-bottom: 5px;
+    }
+
+    .callout {
+      background: rgba(133, 215, 255, 0.05);
+      border-left: 3px solid var(--primary);
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-size: 0.9rem;
+    }
+    
+    .actions-panel {
+      border-top: 1px solid var(--border-glass);
+      padding-top: 25px;
+      margin-top: 30px;
+    }
+    
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .btn {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      text-align: center;
+      display: inline-block;
+      text-decoration: none;
+    }
+    
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-main);
+      border: 1px solid var(--border-glass);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    
+    .btn-danger {
+      background: rgba(255, 107, 107, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+    
+    .btn-danger:hover {
+      background: rgba(255, 107, 107, 0.25);
+    }
+    
+    .alert {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    
+    .alert-success {
+      background: rgba(107, 235, 140, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(107, 235, 140, 0.2);
+    }
+    
+    .alert-error {
+      background: rgba(255, 107, 107, 0.1);
+      color: var(--danger);
+      border: 1px solid rgba(255, 107, 107, 0.2);
+    }
+
+    .account-badge {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="privacy-card">
+    <h1>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      Your Data & Privacy Control
+    </h1>
+
+    <div id="account-status" class="account-badge">Checking active profile...</div>
+
+    <p>At <strong>MindFlow</strong>, we design our architecture offline-first. Your relaxation, breathing habits, and score progress are primary to you, and we prioritize giving you absolute transparency and ownership of your records.</p>
+    
+    <h2>1. Data Custody Summary</h2>
+    <ul>
+      <li><strong>Local Storage:</strong> All profile settings, streaks, levels, and completed session notes are stored directly inside your browser cache. No account is required to play.</li>
+      <li><strong>Cloud Syncing:</strong> If you sign in, progress parameters (experience level, calm metrics, session durations, and environment logs) are transmitted securely using JSON web tokens (JWT) to your account on our cloud database so you can sync progress across devices.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Wellness Disclaimer:</strong> MindFlow is designed to guide relaxing breathing patterns and attention training for study breaks or stress relief. It is a wellness experience, not a clinical treatment, and does not record HIPAA-regulated medical diagnoses.
+    </div>
+
+    <h2>2. Your Data Sovereignty Rights</h2>
+    <p>Under regulations like GDPR, you hold rights over your personal data. We expose these controls directly below so you can audit or erase your data at any time.</p>
+
+    <div class="actions-panel">
+      <div id="status-message" class="alert"></div>
+      
+      <div class="btn-group">
+        <button id="export-btn" class="btn btn-secondary">
+          📥 Export Data Logs (JSON format)
+        </button>
+        
+        <button id="purge-btn" class="btn btn-danger">
+          ⚠️ Permanently Purge Account & Wipes Sync Records
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Load local auth credentials
+    const token = localStorage.getItem('mindflow_token');
+    const userJson = localStorage.getItem('mindflow_user');
+    const accountStatusDiv = document.getElementById('account-status');
+    const statusMsg = document.getElementById('status-message');
+    
+    let user = null;
+    if (userJson) {
+      try {
+        user = JSON.parse(userJson);
+      } catch(e) {}
+    }
+
+    if (user && token) {
+      accountStatusDiv.textContent = `Linked Account: ${user.display_name} (${user.email || 'Guest Profile'})`;
+      accountStatusDiv.style.color = 'var(--primary)';
+    } else {
+      accountStatusDiv.textContent = `Offline Profile (Guest mode, data is browser-only)`;
+      accountStatusDiv.style.color = 'var(--text-muted)';
+    }
+
+    // 1. Export Data Logs Action
+    document.getElementById('export-btn').addEventListener('click', () => {
+      const exportData = {
+        meta: {
+          exported_at: new Date().toISOString(),
+          version: '1.0.0'
+        },
+        local_database: {
+          profiles: localStorage.getItem('mindflow_profiles'),
+          progress: localStorage.getItem('mindflow_progress'),
+          sessions: localStorage.getItem('mindflow_sessions'),
+          settings: localStorage.getItem('mindflow_settings'),
+          active_profile_id: localStorage.getItem('mindflow_active_profile_id')
+        }
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `mindflow_data_export_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      showStatus('Successfully compiled and downloaded your database logs.', 'success');
+    });
+
+    // 2. Account Purging Action
+    document.getElementById('purge-btn').addEventListener('click', async () => {
+      const confirmFirst = confirm("Warning: This action will permanently erase your local cache profile, settings, and streak histories. If you are signed in, it will call the cloud database to wipe your record permanently. This action cannot be undone.\n\nDo you want to continue?");
+      if (!confirmFirst) return;
+
+      const confirmSecond = confirm("Are you absolutely sure you want to wipe all records?");
+      if (!confirmSecond) return;
+
+      if (token) {
+        // Logged in: first delete server database
+        showStatus('Sending server purge request...', 'success');
+        try {
+          const response = await fetch('/api/user/purge', {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (!response.ok) {
+            const errResult = await response.json();
+            throw new Error(errResult.error || 'Server purge failed');
+          }
+        } catch (error) {
+          showStatus(`Cloud purge failed: ${error.message}. Local storage will still be wiped.`, 'error');
+          console.error(error);
+        }
+      }
+
+      // Wipe local storage
+      localStorage.clear();
+      showStatus('Success! Local profiles wiped and account purged from server. This tab will refresh shortly.', 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+    });
+
+    function showStatus(text, type) {
+      statusMsg.textContent = text;
+      statusMsg.className = `alert alert-${type}`;
+      statusMsg.style.display = 'block';
+    }
+  </script>
+</body>
+</html>

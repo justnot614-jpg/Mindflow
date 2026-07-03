@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Local database store
+database.json
+
+# Local Environment Variables
+.env
+
+# System files
+.DS_Store
+Thumbs.db

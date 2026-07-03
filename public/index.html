@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindFlow - Interactive Mindfulness & Breathing Garden</title>
+  <meta name="description" content="Restore your calm and rebuild a glowing floating world through guided breathing, focus training, and synthesized ambient soundscapes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+  <!-- Full Screen Floating World Background -->
+  <canvas id="world-canvas" class="background-canvas"></canvas>
+  <div class="aurora-overlay"></div>
+
+  <!-- Main HUD Layer -->
+  <div class="hud-container">
+    <header class="hud-header">
+      <div class="logo-area">
+        <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <h1>MindFlow</h1>
+        <span class="badge">Wellness Experience</span>
+      </div>
+      <div class="status-area">
+        <div id="sync-status" class="sync-indicator offline">
+          <span class="dot"></span>
+          <span class="status-text">Offline Mode</span>
+        </div>
+        <button id="auth-btn" class="btn btn-secondary btn-sm">Sign In</button>
+      </div>
+    </header>
+
+    <div class="hud-layout">
+      <!-- Left Panel: Profile & Streaks -->
+      <aside class="panel panel-left glass">
+        <div class="panel-header">
+          <h2>Your Journey</h2>
+        </div>
+        <div class="panel-content">
+          <!-- Profile Quickview -->
+          <div class="profile-card">
+            <div class="avatar-circle">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a4 4 0 0 0-4 4v2a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4zm-8 16a8 8 0 0 1 16 0H4z"/>
+              </svg>
+            </div>
+            <div class="profile-info">
+              <h3 id="profile-name">Guest</h3>
+              <p id="profile-status">Local Account</p>
+            </div>
+          </div>
+
+          <!-- Progress Block -->
+          <div class="progress-block">
+            <div class="level-label">
+              <span>Level <strong id="progress-level">1</strong></span>
+              <span id="xp-label">0 / 100 XP</span>
+            </div>
+            <div class="progress-bar-container">
+              <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div class="stats-row">
+              <div class="stat-item">
+                <span class="stat-val" id="progress-streak">0</span>
+                <span class="stat-lbl">Day Streak</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-val" id="progress-calm">0%</span>
+                <span class="stat-lbl">Peak Calm</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Environment Unlocks -->
+          <div class="unlocks-block">
+            <h4>Environments</h4>
+            <div class="unlocks-list">
+              <button class="env-chip active" data-env="aurora" title="Default environment">Cosmic Aurora</button>
+              <button class="env-chip locked" data-env="forest" disabled title="Unlocks at level 2">
+                Forest Stream <span class="lock-info">🔒 Lvl 2</span>
+              </button>
+              <button class="env-chip locked" data-env="ocean" disabled title="Unlocks at level 3">
+                Ocean Sunset <span class="lock-info">🔒 Lvl 3</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Session Summary Graph -->
+          <div class="history-block">
+            <h4>Activity Log</h4>
+            <div id="history-container" class="history-list">
+              <div class="empty-history">No sessions completed today. Start a cycle below to restore the world!</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right Panel: Controls & Ambient Synthesizer -->
+      <aside class="panel panel-right glass">
+        <div class="panel-header">
+          <h2>Soundscape & Theme</h2>
+        </div>
+        <div class="panel-content">
+          <!-- Ambience Synthesizer Sliders -->
+          <div class="audio-section">
+            <div class="section-title-row">
+              <h3>Ambient Mixer</h3>
+              <button id="master-mute-btn" class="icon-btn" aria-label="Mute Audio">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+              </button>
+            </div>
+            <p class="subtitle">Real-time synthesized calming waves & tones</p>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span>Rain (Noise synthesis)</span>
+                <span id="vol-rain-lbl">0%</span>
+              </div>
+              <input type="range" id="slider-rain" min="0" max="100" value="0" class="vol-slider">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span>Ocean Waves (LFO sweep)</span>
+                <span id="vol-ocean-lbl">30%</span>
+              </div>
+              <input type="range" id="slider-ocean" min="0" max="100" value="30" class="vol-slider">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span>Forest Wind & Birds</span>
+                <span id="vol-forest-lbl">0%</span>
+              </div>
+              <input type="range" id="slider-forest" min="0" max="100" value="0" class="vol-slider">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span>Wind Chimes (Random impulse)</span>
+                <span id="vol-chimes-lbl">40%</span>
+              </div>
+              <input type="range" id="slider-chimes" min="0" max="100" value="40" class="vol-slider">
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span>Soft Piano (Chord Generator)</span>
+                <span id="vol-piano-lbl">50%</span>
+              </div>
+              <input type="range" id="slider-piano" min="0" max="100" value="50" class="vol-slider">
+            </div>
+          </div>
+
+          <!-- Preferences & Themes -->
+          <div class="settings-section">
+            <h3>Accessibility & Themes</h3>
+            <div class="theme-toggle-row">
+              <button id="theme-dark-btn" class="theme-btn active">Dark Theme</button>
+              <button id="theme-light-btn" class="theme-btn">Light Theme</button>
+            </div>
+            
+            <div class="checkbox-group">
+              <label class="checkbox-container">
+                <input type="checkbox" id="pref-motion">
+                <span class="checkmark"></span>
+                Reduced Motion
+              </label>
+            </div>
+            <div class="checkbox-group">
+              <label class="checkbox-container">
+                <input type="checkbox" id="pref-contrast">
+                <span class="checkmark"></span>
+                High Contrast Styles
+              </label>
+            </div>
+
+            <div class="select-group">
+              <label for="pref-colorblind">Color-blind Filter</label>
+              <select id="pref-colorblind" class="form-control">
+                <option value="none">None (Default)</option>
+                <option value="protanopia">Protanopia (Red-blind)</option>
+                <option value="deuteranopia">Deuteranopia (Green-blind)</option>
+                <option value="tritanopia">Tritanopia (Blue-blind)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="footer-links">
+            <a href="privacy.html" target="_blank">Privacy & Data Purge Policy</a>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Space: Main Activity Selection -->
+      <main class="main-viewport">
+        <!-- Floating HUD Activity Selector -->
+        <div id="activity-selector" class="activity-selector glass">
+          <h2>Select Session Mode</h2>
+          <div class="selector-buttons">
+            <button id="select-breathing-btn" class="activity-card">
+              <div class="icon">💨</div>
+              <h3>Guided Breathing</h3>
+              <p>Paced cycles to trigger neurological calm</p>
+            </button>
+            <button id="select-focus-btn" class="activity-card">
+              <div class="icon">🌸</div>
+              <h3>Focus Garden</h3>
+              <p>Attention training with drifting particles</p>
+            </button>
+            <button id="select-playroom-btn" class="activity-card">
+              <div class="icon">✨</div>
+              <h3>Mind Playroom</h3>
+              <p>No-pressure kinetic games for stress relief</p>
+            </button>
+          </div>
+          <div class="restore-tip">
+            <p>Every cycle restores plants, trees, water, and life to the floating island background!</p>
+          </div>
+        </div>
+
+        <!-- Breathing Interface -->
+        <div id="breathing-panel" class="activity-panel glass hidden">
+          <button class="back-btn" id="breathing-back-btn">← Back to Modes</button>
+          <h2>Guided Breathing</h2>
+          
+          <div class="pattern-selector">
+            <button class="pattern-btn active" data-pattern="relax">4-4-6 Relax</button>
+            <button class="pattern-btn" data-pattern="box">4-4-4-4 Box Breathing</button>
+            <button class="pattern-btn" data-pattern="deep">4-7-8 Deep Sleep</button>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="breathing-canvas" width="400" height="400"></canvas>
+            <div class="breathing-stats">
+              <span id="breathing-cycle-count">Completed: 0 cycles</span>
+            </div>
+          </div>
+
+          <div class="actions-row">
+            <button id="breathing-start-btn" class="btn btn-primary">Start Session</button>
+            <button id="breathing-stop-btn" class="btn btn-danger hidden">Stop & Save</button>
+          </div>
+        </div>
+
+        <!-- Focus Garden Interface -->
+        <div id="focus-panel" class="activity-panel glass hidden">
+          <button class="back-btn" id="focus-back-btn">← Back to Modes</button>
+          <h2>Focus Garden</h2>
+          <p class="subtitle">Drift your mouse/touch gently over the floating guide particle. Avoid sudden taps or fast shakes.</p>
+
+          <div class="focus-hud">
+            <div class="calm-meter-container">
+              <div class="meter-label">Calm Score</div>
+              <div class="meter-track">
+                <div id="focus-calm-fill" class="meter-fill" style="width: 50%;"></div>
+              </div>
+              <div id="focus-calm-text" class="meter-val">50%</div>
+            </div>
+            <div class="focus-timer" id="focus-timer-lbl">Time: 00:00</div>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="focus-canvas" width="600" height="350"></canvas>
+          </div>
+
+          <div class="actions-row">
+            <button id="focus-start-btn" class="btn btn-primary">Begin Focus Walk</button>
+            <button id="focus-stop-btn" class="btn btn-danger hidden">Complete Session</button>
+          </div>
+        </div>
+
+        <!-- Playroom View Selection Panel -->
+        <div id="playroom-panel" class="activity-panel glass hidden">
+          <button class="back-btn" id="playroom-back-btn">← Back to Modes</button>
+          <h2>Mind Playroom</h2>
+          <p class="subtitle">Select a slow kinetic game. No scoring, no pressure, pure relaxation.</p>
+          
+          <div class="playroom-buttons">
+            <button id="play-bubbles-btn" class="playroom-card">
+              <div class="mini-icon">🫧</div>
+              <h4>Zen Bubbles</h4>
+              <p>Pop floating bubbles for soft musical notes</p>
+            </button>
+            <button id="play-mandala-btn" class="playroom-card">
+              <div class="mini-icon">🌀</div>
+              <h4>Kinetic Mandala</h4>
+              <p>Paint glowing kaleidoscope sand art</p>
+            </button>
+            <button id="play-connect-btn" class="playroom-card">
+              <div class="mini-icon">🌌</div>
+              <h4>Cosmic Connect</h4>
+              <p>Link stars into glowing constellations</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Zen Bubbles Game Screen -->
+        <div id="bubbles-panel" class="activity-panel glass hidden">
+          <button class="back-btn" id="bubbles-back-btn">← Back to Playroom</button>
+          <h2>Zen Bubbles</h2>
+          <p class="subtitle">Hover or tap the rising bubbles to release pentatonic chime waves.</p>
+          <div class="canvas-container">
+            <canvas id="bubbles-canvas" width="460" height="350"></canvas>
+          </div>
+        </div>
+
+        <!-- Kinetic Mandala Game Screen -->
+        <div id="mandala-panel" class="activity-panel glass hidden">
+          <button class="back-btn" id="mandala-back-btn">← Back to Playroom</button>
+          <h2>Kinetic Mandala</h2>
+          <p class="subtitle">Drag mouse/touch on the screen to paint glowing radial paths. Watch them slowly fade.</p>
+          
+          <div class="mandala-controls">
+            <div class="color-palette">
+              <button class="color-dot active" style="background-color: #8cd6ff;" data-color="#8cd6ff"></button>
+              <button class="color-dot" style="background-color: #34d399;" data-color="#34d399"></button>
+              <button class="color-dot" style="background-color: #f87171;" data-color="#f87171"></button>
+              <button class="color-dot" style="background-color: #fde047;" data-color="#fde047"></button>
+              <button class="color-dot" style="background-color: #ffffff;" data-color="#ffffff"></button>
+            </div>
+            <button id="clear-mandala-btn" class="btn btn-secondary btn-sm">Clear Sand</button>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="mandala-canvas" width="460" height="350"></canvas>
+          </div>
+        </div>
+
+        <!-- Cosmic Connect Game Screen -->
+        <div id="connect-panel" class="activity-panel glass hidden">
+          <button class="back-btn" id="connect-back-btn">← Back to Playroom</button>
+          <h2>Cosmic Connect</h2>
+          <p class="subtitle">Click a star and drag to connect constellations. Tap nodes to ring chime sounds.</p>
+          
+          <div class="mandala-controls">
+            <button id="clear-connect-btn" class="btn btn-secondary btn-sm">Clear Skies</button>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="connect-canvas" width="460" height="350"></canvas>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Sign In / Sign Up Modal -->
+  <div id="auth-modal" class="modal-backdrop hidden">
+    <div class="modal-card glass">
+      <button class="modal-close" id="auth-close-btn">&times;</button>
+      <div class="modal-tabs">
+        <button id="tab-login-btn" class="modal-tab active">Log In</button>
+        <button id="tab-register-btn" class="modal-tab">Register Account</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form">
+        <div class="form-group">
+          <label for="login-email">Email Address</label>
+          <input type="email" id="login-email" class="form-control" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div class="alert-container error-alert hidden" id="login-error"></div>
+        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" class="auth-form hidden">
+        <div class="form-group">
+          <label for="reg-name">Display Name</label>
+          <input type="text" id="reg-name" class="form-control" placeholder="Aura Rider" required autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="reg-email">Email Address</label>
+          <input type="email" id="reg-email" class="form-control" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" class="form-control" placeholder="••••••••" required autocomplete="new-password">
+        </div>
+        <div class="alert-container error-alert hidden" id="reg-error"></div>
+        
+        <div class="consent-notice">
+          By registering, you agree that your progress score and settings will be synced securely to the cloud. You can delete your cloud account at any time.
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+      </form>
+
+      <div class="modal-footer">
+        <button id="guest-login-btn" class="btn btn-secondary btn-block">Continue as Guest (Offline Sync)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cloud Sync Conflict Resolution Modal -->
+  <div id="conflict-modal" class="modal-backdrop hidden">
+    <div class="modal-card glass">
+      <h2>Resolve Sync Conflict</h2>
+      <p>We found conflicting game progress levels and scores between this browser and your cloud backup.</p>
+      
+      <div class="conflict-comparison">
+        <div class="conflict-option" id="conflict-local-card">
+          <h3>Local Browser Version</h3>
+          <p class="detail" id="conflict-local-level">Level: 1</p>
+          <p class="detail" id="conflict-local-streak">Streak: 0 days</p>
+          <p class="detail" id="conflict-local-sessions">Sessions: 0</p>
+          <button id="resolve-keep-local-btn" class="btn btn-secondary btn-block">Keep Local Version</button>
+        </div>
+        
+        <div class="conflict-option" id="conflict-cloud-card">
+          <h3>Cloud Backup Version</h3>
+          <p class="detail" id="conflict-cloud-level">Level: 1</p>
+          <p class="detail" id="conflict-cloud-streak">Streak: 0 days</p>
+          <p class="detail" id="conflict-cloud-sessions">Sessions: 0</p>
+          <button id="resolve-keep-cloud-btn" class="btn btn-primary btn-block">Use Cloud Version</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Client-side Audio context initializer popup (browser requirement) -->
+    <div id="audio-optin-banner" class="audio-banner glass">
+      <div class="banner-content">
+        <span>🎵 MindFlow synthesizes soundscapes in real-time. Tap Enable to allow soothing sounds.</span>
+        <button id="enable-audio-btn" class="btn btn-primary btn-sm">Enable Sound</button>
+      </div>
+    </div>
+
+    <!-- Toast Notification Overlay Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="audio.js"></script>
+    <script src="breathing.js"></script>
+    <script src="focus.js"></script>
+    <script src="world.js"></script>
+    <script src="playroom.js"></script>
+    <script src="app.js"></script>
+  </body>
+  </html>
