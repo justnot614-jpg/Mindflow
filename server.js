@@ -38,8 +38,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// JSON Database Helper Functions
-function readDb() {
+// Async Database Helpers (handles Vercel KV when online, falls back to local JSON file)
+async function readDb() {
+  // If running on Vercel with KV variables injected
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      const { kv } = require('@vercel/kv');
+      const data = await kv.get('mindflow_db');
+      if (data) {
+        return typeof data === 'string' ? JSON.parse(data) : data;
+      }
+    } catch (err) {
+      console.error("Vercel KV read error, falling back to local file:", err);
+    }
+  }
+
+  // Local filesystem fallback
   if (!fs.existsSync(DB_PATH)) {
     const initial = {
       users: [],
@@ -61,7 +75,19 @@ function readDb() {
   }
 }
 
-function writeDb(data) {
+async function writeDb(data) {
+  // If running on Vercel with KV variables injected
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      const { kv } = require('@vercel/kv');
+      await kv.set('mindflow_db', data);
+      return;
+    } catch (err) {
+      console.error("Vercel KV write error, falling back to local file:", err);
+    }
+  }
+
+  // Local filesystem fallback
   try {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
@@ -93,13 +119,13 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Email, password, and display name are required' });
   }
 
-  const db = readDb();
-  const existingUser = db.users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-  if (existingUser) {
-    return res.status(400).json({ error: 'An account with this email already exists' });
-  }
-
   try {
+    const db = await readDb();
+    const existingUser = db.users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      return res.status(400).json({ error: 'An account with this email already exists' });
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = 'u_' + Math.random().toString(36).substr(2, 9);
     const user = {
@@ -156,7 +182,7 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       updated_at: new Date().toISOString()
     });
 
-    writeDb(db);
+    await writeDb(db);
 
     const accessToken = jwt.sign({ user_id: userId, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({
@@ -165,6 +191,7 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       profile_id: profileId
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error during registration' });
   }
 });
@@ -177,20 +204,20 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  const db = readDb();
-  const user = db.users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-  if (!user) {
-    return res.status(400).json({ error: 'Invalid email or password' });
-  }
-
   try {
+    const db = await readDb();
+    const user = db.users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid email or password' });
+    }
+
     const validPassword = await bcrypt.compare(password, user.passwordHash);
     if (!validPassword) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
     user.last_login = new Date().toISOString();
-    writeDb(db);
+    await writeDb(db);
 
     // Retrieve the active profile associated with the user
     const profile = db.profiles.find(p => p.user_id === user.user_id) || null;
@@ -203,81 +230,88 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
       profile_id: profileId
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error logging in' });
   }
 });
 
 // 3. Anonymous Guest Registration
-app.post('/api/auth/anonymous', authRateLimiter, (req, res) => {
+app.post('/api/auth/anonymous', authRateLimiter, async (req, res) => {
   const { deviceName, platform } = req.body;
-  const db = readDb();
 
-  const userId = 'g_' + Math.random().toString(36).substr(2, 9);
-  const deviceId = 'd_' + Math.random().toString(36).substr(2, 9);
-  const profileId = 'p_' + Math.random().toString(36).substr(2, 9);
+  try {
+    const db = await readDb();
 
-  const guestUser = {
-    user_id: userId,
-    email: null,
-    passwordHash: null,
-    display_name: 'Guest Player',
-    created_at: new Date().toISOString(),
-    last_login: new Date().toISOString()
-  };
+    const userId = 'g_' + Math.random().toString(36).substr(2, 9);
+    const deviceId = 'd_' + Math.random().toString(36).substr(2, 9);
+    const profileId = 'p_' + Math.random().toString(36).substr(2, 9);
 
-  db.users.push(guestUser);
+    const guestUser = {
+      user_id: userId,
+      email: null,
+      passwordHash: null,
+      display_name: 'Guest Player',
+      created_at: new Date().toISOString(),
+      last_login: new Date().toISOString()
+    };
 
-  db.devices.push({
-    device_id: deviceId,
-    user_id: userId,
-    device_name: deviceName || 'Web Browser',
-    platform: platform || 'Web',
-    last_sync: new Date().toISOString(),
-    local_profile_id: profileId
-  });
+    db.users.push(guestUser);
 
-  db.profiles.push({
-    profile_id: profileId,
-    user_id: userId,
-    nickname: 'Guest',
-    avatar: 'lotus',
-    preferences: {},
-    updated_at: new Date().toISOString()
-  });
+    db.devices.push({
+      device_id: deviceId,
+      user_id: userId,
+      device_name: deviceName || 'Web Browser',
+      platform: platform || 'Web',
+      last_sync: new Date().toISOString(),
+      local_profile_id: profileId
+    });
 
-  db.settings.push({
-    profile_id: profileId,
-    theme: 'dark',
-    volumes: { rain: 0, ocean: 30, forest: 0, chimes: 40, piano: 50 },
-    difficulty: 'normal',
-    accessibility: { reducedMotion: false, highContrast: false, colorBlind: 'none' },
-    language: 'en',
-    updated_at: new Date().toISOString()
-  });
+    db.profiles.push({
+      profile_id: profileId,
+      user_id: userId,
+      nickname: 'Guest',
+      avatar: 'lotus',
+      preferences: {},
+      updated_at: new Date().toISOString()
+    });
 
-  db.progress.push({
-    progress_id: 'pr_' + Math.random().toString(36).substr(2, 9),
-    profile_id: profileId,
-    level: 1,
-    experience: 0,
-    streak: 0,
-    unlockables: ['environment:aurora'],
-    calm_score: 0,
-    updated_at: new Date().toISOString()
-  });
+    db.settings.push({
+      profile_id: profileId,
+      theme: 'dark',
+      volumes: { rain: 0, ocean: 30, forest: 0, chimes: 40, piano: 50 },
+      difficulty: 'normal',
+      accessibility: { reducedMotion: false, highContrast: false, colorBlind: 'none' },
+      language: 'en',
+      updated_at: new Date().toISOString()
+    });
 
-  writeDb(db);
+    db.progress.push({
+      progress_id: 'pr_' + Math.random().toString(36).substr(2, 9),
+      profile_id: profileId,
+      level: 1,
+      experience: 0,
+      streak: 0,
+      unlockables: ['environment:aurora'],
+      calm_score: 0,
+      updated_at: new Date().toISOString()
+    });
 
-  const accessToken = jwt.sign({ user_id: userId, email: null }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({
-    token: accessToken,
-    user: { user_id: userId, email: null, display_name: 'Guest Player' },
-    profile_id: profileId
-  });
+    await writeDb(db);
+
+    const accessToken = jwt.sign({ user_id: userId, email: null }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({
+      token: accessToken,
+      user: { user_id: userId, email: null, display_name: 'Guest Player' },
+      profile_id: profileId
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error generating guest profile' });
+  }
 });
 
 // 4. Synchronization (Local-first reconciliation endpoint)
-app.post('/api/sync', authenticateToken, (req, res) => {
+app.post('/api/sync', authenticateToken, async (req, res) => {
   const userId = req.user.user_id;
   const { profiles, progress, sessions, settings } = req.body;
   
@@ -285,122 +319,127 @@ app.post('/api/sync', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Invalid sync payload' });
   }
 
-  const db = readDb();
+  try {
+    const db = await readDb();
 
-  // Helper to filter/find user profiles on the server
-  const userProfiles = db.profiles.filter(p => p.user_id === userId);
-  const userProfileIds = userProfiles.map(p => p.profile_id);
+    // Helper to filter/find user profiles on the server
+    const userProfiles = db.profiles.filter(p => p.user_id === userId);
+    const userProfileIds = userProfiles.map(p => p.profile_id);
 
-  // Sync Profiles
-  profiles.forEach(clientProfile => {
-    // Check if profile belongs to this user (or if client is binding an existing profile to this logged in user)
-    let serverProfile = db.profiles.find(p => p.profile_id === clientProfile.profile_id);
-    if (!serverProfile) {
-      // Profile is new to the cloud. Create it.
-      clientProfile.user_id = userId; // bind to this user
-      db.profiles.push(clientProfile);
-      userProfileIds.push(clientProfile.profile_id);
-    } else if (serverProfile.user_id === userId) {
-      // Overwrite if client is newer
-      const serverTime = new Date(serverProfile.updated_at || 0).getTime();
-      const clientTime = new Date(clientProfile.updated_at || 0).getTime();
-      if (clientTime > serverTime) {
-        Object.assign(serverProfile, clientProfile);
-      }
-    }
-  });
-
-  // Sync Settings
-  settings.forEach(clientSetting => {
-    if (userProfileIds.includes(clientSetting.profile_id)) {
-      let serverSetting = db.settings.find(s => s.profile_id === clientSetting.profile_id);
-      if (!serverSetting) {
-        db.settings.push(clientSetting);
-      } else {
-        const serverTime = new Date(serverSetting.updated_at || 0).getTime();
-        const clientTime = new Date(clientSetting.updated_at || 0).getTime();
+    // Sync Profiles
+    profiles.forEach(clientProfile => {
+      let serverProfile = db.profiles.find(p => p.profile_id === clientProfile.profile_id);
+      if (!serverProfile) {
+        clientProfile.user_id = userId; // bind to this user
+        db.profiles.push(clientProfile);
+        userProfileIds.push(clientProfile.profile_id);
+      } else if (serverProfile.user_id === userId) {
+        const serverTime = new Date(serverProfile.updated_at || 0).getTime();
+        const clientTime = new Date(clientProfile.updated_at || 0).getTime();
         if (clientTime > serverTime) {
-          Object.assign(serverSetting, clientSetting);
+          Object.assign(serverProfile, clientProfile);
         }
       }
-    }
-  });
+    });
 
-  // Sync Progress
-  progress.forEach(clientProgress => {
-    if (userProfileIds.includes(clientProgress.profile_id)) {
-      let serverProgress = db.progress.find(p => p.profile_id === clientProgress.profile_id);
-      if (!serverProgress) {
-        db.progress.push(clientProgress);
-      } else {
-        const serverTime = new Date(serverProgress.updated_at || 0).getTime();
-        const clientTime = new Date(clientProgress.updated_at || 0).getTime();
-        if (clientTime > serverTime) {
-          // Merge experience / streak values (taking highwater marks) or overwrite
-          serverProgress.level = Math.max(serverProgress.level, clientProgress.level);
-          serverProgress.experience = Math.max(serverProgress.experience, clientProgress.experience);
-          serverProgress.streak = Math.max(serverProgress.streak, clientProgress.streak);
-          
-          // Merge unlockables
-          const mergedUnlockables = Array.from(new Set([...(serverProgress.unlockables || []), ...(clientProgress.unlockables || [])]));
-          serverProgress.unlockables = mergedUnlockables;
-          serverProgress.calm_score = Math.max(serverProgress.calm_score, clientProgress.calm_score);
-          serverProgress.updated_at = clientProgress.updated_at;
+    // Sync Settings
+    settings.forEach(clientSetting => {
+      if (userProfileIds.includes(clientSetting.profile_id)) {
+        let serverSetting = db.settings.find(s => s.profile_id === clientSetting.profile_id);
+        if (!serverSetting) {
+          db.settings.push(clientSetting);
+        } else {
+          const serverTime = new Date(serverSetting.updated_at || 0).getTime();
+          const clientTime = new Date(clientSetting.updated_at || 0).getTime();
+          if (clientTime > serverTime) {
+            Object.assign(serverSetting, clientSetting);
+          }
         }
       }
-    }
-  });
+    });
 
-  // Sync Sessions (append only, matches on session_id to avoid duplicates)
-  sessions.forEach(clientSession => {
-    if (userProfileIds.includes(clientSession.profile_id)) {
-      let serverSession = db.sessions.find(s => s.session_id === clientSession.session_id);
-      if (!serverSession) {
-        db.sessions.push(clientSession);
-      } else {
-        // Sessions are generally immutable, but override if edited client-side
-        const serverTime = new Date(serverSession.updated_at || 0).getTime();
-        const clientTime = new Date(clientSession.updated_at || 0).getTime();
-        if (clientTime > serverTime) {
-          Object.assign(serverSession, clientSession);
+    // Sync Progress
+    progress.forEach(clientProgress => {
+      if (userProfileIds.includes(clientProgress.profile_id)) {
+        let serverProgress = db.progress.find(p => p.profile_id === clientProgress.profile_id);
+        if (!serverProgress) {
+          db.progress.push(clientProgress);
+        } else {
+          const serverTime = new Date(serverProgress.updated_at || 0).getTime();
+          const clientTime = new Date(clientProgress.updated_at || 0).getTime();
+          if (clientTime > serverTime) {
+            serverProgress.level = Math.max(serverProgress.level, clientProgress.level);
+            serverProgress.experience = Math.max(serverProgress.experience, clientProgress.experience);
+            serverProgress.streak = Math.max(serverProgress.streak, clientProgress.streak);
+            
+            const mergedUnlockables = Array.from(new Set([...(serverProgress.unlockables || []), ...(clientProgress.unlockables || [])]));
+            serverProgress.unlockables = mergedUnlockables;
+            serverProgress.calm_score = Math.max(serverProgress.calm_score, clientProgress.calm_score);
+            serverProgress.updated_at = clientProgress.updated_at;
+          }
         }
       }
-    }
-  });
+    });
 
-  // Save changes
-  writeDb(db);
+    // Sync Sessions (append only, matches on session_id to avoid duplicates)
+    sessions.forEach(clientSession => {
+      if (userProfileIds.includes(clientSession.profile_id)) {
+        let serverSession = db.sessions.find(s => s.session_id === clientSession.session_id);
+        if (!serverSession) {
+          db.sessions.push(clientSession);
+        } else {
+          const serverTime = new Date(serverSession.updated_at || 0).getTime();
+          const clientTime = new Date(clientSession.updated_at || 0).getTime();
+          if (clientTime > serverTime) {
+            Object.assign(serverSession, clientSession);
+          }
+        }
+      }
+    });
 
-  // Return server state back to client to let it update missing fields
-  const updatedDb = readDb();
-  res.json({
-    profiles: updatedDb.profiles.filter(p => p.user_id === userId),
-    settings: updatedDb.settings.filter(s => userProfileIds.includes(s.profile_id)),
-    progress: updatedDb.progress.filter(pr => userProfileIds.includes(pr.profile_id)),
-    sessions: updatedDb.sessions.filter(se => userProfileIds.includes(se.profile_id))
-  });
+    // Save changes
+    await writeDb(db);
+
+    // Return server state back to client
+    const updatedDb = await readDb();
+    res.json({
+      profiles: updatedDb.profiles.filter(p => p.user_id === userId),
+      settings: updatedDb.settings.filter(s => userProfileIds.includes(s.profile_id)),
+      progress: updatedDb.progress.filter(pr => userProfileIds.includes(pr.profile_id)),
+      sessions: updatedDb.sessions.filter(se => userProfileIds.includes(se.profile_id))
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Sync failed on server' });
+  }
 });
 
 // 5. User Account & Data Purge (Erase user from database completely)
-app.delete('/api/user/purge', authenticateToken, (req, res) => {
+app.delete('/api/user/purge', authenticateToken, async (req, res) => {
   const userId = req.user.user_id;
-  const db = readDb();
 
-  // Find user details and profiles
-  const profilesToPurge = db.profiles.filter(p => p.user_id === userId);
-  const profileIdsToPurge = profilesToPurge.map(p => p.profile_id);
+  try {
+    const db = await readDb();
 
-  // Filter out all elements belonging to this user or their profiles
-  db.users = db.users.filter(u => u.user_id !== userId);
-  db.devices = db.devices.filter(d => d.user_id !== userId);
-  db.profiles = db.profiles.filter(p => p.user_id !== userId);
-  db.settings = db.settings.filter(s => !profileIdsToPurge.includes(s.profile_id));
-  db.progress = db.progress.filter(pr => !profileIdsToPurge.includes(pr.profile_id));
-  db.sessions = db.sessions.filter(se => !profileIdsToPurge.includes(se.profile_id));
+    // Find user details and profiles
+    const profilesToPurge = db.profiles.filter(p => p.user_id === userId);
+    const profileIdsToPurge = profilesToPurge.map(p => p.profile_id);
 
-  writeDb(db);
+    // Filter out all elements belonging to this user or their profiles
+    db.users = db.users.filter(u => u.user_id !== userId);
+    db.devices = db.devices.filter(d => d.user_id !== userId);
+    db.profiles = db.profiles.filter(p => p.user_id !== userId);
+    db.settings = db.settings.filter(s => !profileIdsToPurge.includes(s.profile_id));
+    db.progress = db.progress.filter(pr => !profileIdsToPurge.includes(pr.profile_id));
+    db.sessions = db.sessions.filter(se => !profileIdsToPurge.includes(se.profile_id));
 
-  res.json({ success: true, message: 'All personal data and progress permanently purged from cloud server.' });
+    await writeDb(db);
+
+    res.json({ success: true, message: 'All personal data and progress permanently purged from cloud server.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Purge failed on server' });
+  }
 });
 
 // Fallback to client layout
@@ -408,10 +447,15 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start listening
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`  MindFlow Backend Server running on port ${PORT}`);
-  console.log(`  Local Address: http://localhost:${PORT}`);
-  console.log(`====================================================`);
-});
+// Export Express app for Vercel Serverless environment
+module.exports = app;
+
+// Start listening locally if not imported as serverless helper
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`  MindFlow Backend Server running on port ${PORT}`);
+    console.log(`  Local Address: http://localhost:${PORT}`);
+    console.log(`====================================================`);
+  });
+}
