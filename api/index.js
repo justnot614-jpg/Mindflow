@@ -36,7 +36,8 @@ const authRateLimiter = (req, res, next) => {
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static client assets from the parent public folder (used for local testing)
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Async Database Helpers (handles JSONBin.io cloud DB online, falls back to local file)
 async function readDb() {
@@ -457,9 +458,9 @@ app.delete('/api/user/purge', authenticateToken, async (req, res) => {
   }
 });
 
-// Fallback to client layout
+// Fallback to client layout (points to parent directory public/index.html)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 // Export Express app for Vercel Serverless environment

@@ -27,6 +27,18 @@ class FloatingWorldController {
     this.animationId = null;
     this.reducedMotion = false;
     
+    // Stars for Aurora Sky
+    this.stars = [];
+    for (let i = 0; i < 45; i++) {
+      this.stars.push({
+        x: Math.random(),
+        y: Math.random() * 0.45,
+        size: 0.5 + Math.random() * 1.5,
+        twinkleSpeed: 0.01 + Math.random() * 0.02,
+        val: Math.random() * Math.PI
+      });
+    }
+    
     // Resize handler
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -100,6 +112,13 @@ class FloatingWorldController {
           c.y = 80 + Math.random() * 120;
         }
       });
+
+      // Update stars twinkle
+      if (this.environment === 'aurora') {
+        this.stars.forEach(s => {
+          s.val += s.twinkleSpeed;
+        });
+      }
     }
 
     // Adjust fireflies dynamically based on calm score
@@ -142,24 +161,33 @@ class FloatingWorldController {
     // 1. Draw Sky Gradients based on environment
     this.drawSkyBackground();
 
-    // 2. Draw Aurora Waves
+    // 2. Draw Stars (Aurora), Sunset (Ocean), or Silhouettes (Forest)
+    if (this.environment === 'aurora') {
+      this.drawStars();
+    } else if (this.environment === 'ocean') {
+      this.drawOceanSunset();
+    } else if (this.environment === 'forest') {
+      this.drawForestSilhouettes();
+    }
+
+    // 3. Draw Aurora Waves
     this.drawAuroraWaves();
 
-    // 3. Draw Background Clouds
+    // 4. Draw Background Clouds
     this.drawClouds();
 
-    // 4. Draw Floating Island base rock
+    // 5. Draw Floating Island base rock
     const cx = this.canvas.width / 2;
     const cy = this.canvas.height / 2 + 60; // island anchor point
     this.drawIslandBase(cx, cy);
 
-    // 5. Draw Waterfall flowing down
+    // 6. Draw Waterfall flowing down
     this.drawWaterfall(cx, cy);
 
-    // 6. Draw Trees & Plants growth
+    // 7. Draw Trees & Plants growth
     this.drawPlants(cx, cy);
 
-    // 7. Draw Fireflies
+    // 8. Draw Fireflies
     this.drawFireflies();
   }
 
@@ -183,6 +211,84 @@ class FloatingWorldController {
     }
     this.ctx.fillStyle = grad;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  drawStars() {
+    this.ctx.save();
+    this.stars.forEach(s => {
+      const alpha = 0.2 + Math.abs(Math.sin(s.val)) * 0.7;
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      this.ctx.beginPath();
+      this.ctx.arc(s.x * this.canvas.width, s.y * this.canvas.height, s.size, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+    this.ctx.restore();
+  }
+
+  drawForestSilhouettes() {
+    this.ctx.save();
+    
+    // Draw far tree silhouettes
+    this.ctx.fillStyle = 'rgba(5, 18, 25, 0.4)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, this.canvas.height);
+    this.ctx.lineTo(0, this.canvas.height - 180);
+    this.ctx.quadraticCurveTo(this.canvas.width * 0.3, this.canvas.height - 240, this.canvas.width * 0.6, this.canvas.height - 150);
+    this.ctx.quadraticCurveTo(this.canvas.width * 0.8, this.canvas.height - 120, this.canvas.width, this.canvas.height - 200);
+    this.ctx.lineTo(this.canvas.width, this.canvas.height);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // Draw close tree silhouettes
+    this.ctx.fillStyle = 'rgba(3, 10, 15, 0.7)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, this.canvas.height);
+    this.ctx.lineTo(0, this.canvas.height - 100);
+    this.ctx.quadraticCurveTo(this.canvas.width * 0.4, this.canvas.height - 160, this.canvas.width * 0.7, this.canvas.height - 90);
+    this.ctx.quadraticCurveTo(this.canvas.width * 0.9, this.canvas.height - 120, this.canvas.width, this.canvas.height - 70);
+    this.ctx.lineTo(this.canvas.width, this.canvas.height);
+    this.ctx.closePath();
+    this.ctx.fill();
+    
+    this.ctx.restore();
+  }
+
+  drawOceanSunset() {
+    this.ctx.save();
+
+    const horizon = this.canvas.height - 120;
+    
+    // Draw Sunset Sun
+    const sunX = this.canvas.width / 2;
+    const sunY = horizon - 20;
+    const sunRadius = 50 + (this.calmScore * 0.3); // grows slightly as you focus!
+    
+    const sunGrad = this.ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
+    sunGrad.addColorStop(0, '#fef08a'); // soft yellow center
+    sunGrad.addColorStop(0.3, '#fb923c'); // orange mid
+    sunGrad.addColorStop(1, 'rgba(107, 45, 92, 0)'); // fade out
+    
+    this.ctx.fillStyle = sunGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(sunX, sunY, sunRadius * 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // Draw Horizon Water
+    this.ctx.fillStyle = '#100d23';
+    this.ctx.fillRect(0, horizon, this.canvas.width, this.canvas.height - horizon);
+
+    // Draw sun reflection ripples on water
+    this.ctx.strokeStyle = 'rgba(251, 146, 60, 0.15)';
+    this.ctx.lineWidth = 2;
+    for (let y = horizon + 5; y < this.canvas.height; y += 12) {
+      const width = 120 * (1 - (y - horizon) / (this.canvas.height - horizon));
+      this.ctx.beginPath();
+      this.ctx.moveTo(sunX - width / 2, y);
+      this.ctx.lineTo(sunX + width / 2, y);
+      this.ctx.stroke();
+    }
+    
+    this.ctx.restore();
   }
 
   drawAuroraWaves() {
@@ -282,14 +388,20 @@ class FloatingWorldController {
     this.ctx.beginPath();
     this.ctx.ellipse(cx, cy, 160, 45, 0, 0, Math.PI * 2);
     
-    // Grass color adjusts from brown/dead to glowing green as calm score increases
-    const grassR = Math.floor(15 - (this.calmScore * 0.15));
-    const grassG = Math.floor(25 + (this.calmScore * 1.5));
-    const grassB = Math.floor(35 + (this.calmScore * 0.5));
-    
     const capGrad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, 160);
-    capGrad.addColorStop(0, `rgb(${grassR + 40}, ${grassG + 40}, ${grassB + 40})`);
-    capGrad.addColorStop(1, `rgb(${grassR}, ${grassG}, ${grassB})`);
+    if (this.environment === 'ocean') {
+      // Warm golden beach sand
+      capGrad.addColorStop(0, '#f59e0b');
+      capGrad.addColorStop(1, '#b45309');
+    } else if (this.environment === 'forest') {
+      // Deep lush forest moss
+      capGrad.addColorStop(0, '#10b981');
+      capGrad.addColorStop(1, '#064e3b');
+    } else {
+      // Mystical purple soil
+      capGrad.addColorStop(0, '#8b5cf6');
+      capGrad.addColorStop(1, '#4c1d95');
+    }
     
     this.ctx.fillStyle = capGrad;
     this.ctx.fill();
@@ -322,9 +434,22 @@ class FloatingWorldController {
 
     // Drawing waterfall gradient
     const waterGrad = this.ctx.createLinearGradient(fallX, fallY, fallX, fallY + fallHeight);
-    waterGrad.addColorStop(0, 'rgba(133, 215, 255, 0.85)');
-    waterGrad.addColorStop(0.5, 'rgba(167, 139, 250, 0.6)');
-    waterGrad.addColorStop(1, 'rgba(255, 255, 255, 0)'); // fades into space clouds
+    if (this.environment === 'ocean') {
+      // Gold and orange sunset flow
+      waterGrad.addColorStop(0, 'rgba(251, 146, 60, 0.85)');
+      waterGrad.addColorStop(0.5, 'rgba(244, 63, 94, 0.6)');
+      waterGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (this.environment === 'forest') {
+      // Clean emerald forest stream
+      waterGrad.addColorStop(0, 'rgba(52, 211, 153, 0.85)');
+      waterGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.6)');
+      waterGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else {
+      // Cosmic stardust flow
+      waterGrad.addColorStop(0, 'rgba(133, 215, 255, 0.85)');
+      waterGrad.addColorStop(0.5, 'rgba(167, 139, 250, 0.6)');
+      waterGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } // fades into space clouds
 
     this.ctx.fillStyle = waterGrad;
 
