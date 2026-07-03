@@ -38,18 +38,24 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Async Database Helpers (handles Vercel KV when online, falls back to local JSON file)
+// Async Database Helpers (handles JSONBin.io cloud DB online, falls back to local file)
 async function readDb() {
-  // If running on Vercel with KV variables injected
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // If JSONBin variables are injected in environment (e.g. on Vercel)
+  if (process.env.JSONBIN_BIN_ID && process.env.JSONBIN_API_KEY) {
     try {
-      const { kv } = require('@vercel/kv');
-      const data = await kv.get('mindflow_db');
-      if (data) {
-        return typeof data === 'string' ? JSON.parse(data) : data;
+      const response = await fetch(`https://api.jsonbin.io/v3/b/${process.env.JSONBIN_BIN_ID}/latest`, {
+        headers: {
+          'X-Master-Key': process.env.JSONBIN_API_KEY,
+          'X-Bin-Meta': 'false'
+        }
+      });
+      if (response.ok) {
+        return await response.json();
+      } else {
+        console.error("JSONBin read error status:", response.status);
       }
     } catch (err) {
-      console.error("Vercel KV read error, falling back to local file:", err);
+      console.error("JSONBin read error, falling back to local file:", err);
     }
   }
 
@@ -76,14 +82,23 @@ async function readDb() {
 }
 
 async function writeDb(data) {
-  // If running on Vercel with KV variables injected
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // If JSONBin variables are injected in environment (e.g. on Vercel)
+  if (process.env.JSONBIN_BIN_ID && process.env.JSONBIN_API_KEY) {
     try {
-      const { kv } = require('@vercel/kv');
-      await kv.set('mindflow_db', data);
+      const response = await fetch(`https://api.jsonbin.io/v3/b/${process.env.JSONBIN_BIN_ID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': process.env.JSONBIN_API_KEY
+        },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        console.error("JSONBin write error status:", response.status);
+      }
       return;
     } catch (err) {
-      console.error("Vercel KV write error, falling back to local file:", err);
+      console.error("JSONBin write error, falling back to local file:", err);
     }
   }
 
